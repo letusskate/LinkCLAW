@@ -1,4 +1,4 @@
-# design1LSA, LAP, and AsyncBench
+# LinkCLAW
 
 ## 1. Repository Overview
 
