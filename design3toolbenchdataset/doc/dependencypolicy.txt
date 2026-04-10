@@ -1,0 +1,83 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{AsyncBench Dependency Policy}
+\label{sec:supp_asyncbench_variants}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+AsyncBench is constructed from the same underlying pool of parsed multi-tool trajectories, while the key difference lies in how dependencies among tool calls are inferred when building the sample-level DAG.
+We therefore treat these settings as three \emph{dependency policy variants} rather than three unrelated datasets.
+All retention numbers below are measured against the same 44,705 parsable multi-tool ToolBench trajectories with non-empty final answers.
+
+\textbf{LLM-DAG.}
+This variant uses an LLM-based dependency parser to infer whether each tool call must wait for another call's result.
+The parser follows a strict policy: if a call semantically depends on a previous output, we add a directed dependency edge; otherwise the two calls are allowed to execute in parallel.
+This produces the most conservative DAG among the three variants and is intended to preserve semantic execution order as faithfully as possible.
+
+\textbf{Balanced-DAG.}
+This is the default variant used in the main paper.
+It applies a lightweight heuristic policy based on explicit dependency cues in the trajectory, such as keywords indicating sequential execution, next-step planning, or result-conditioned follow-up actions.
+Calls with explicit ordering evidence are connected by dependency edges, while calls without such evidence are treated as parallelizable.
+This variant is designed to strike a balance between semantic faithfulness and concurrency.
+
+\textbf{All-Parallel.}
+This variant ignores inferred dependencies within each step and treats all tool calls as parallel-dispatch candidates.
+It is not intended to be the most semantically faithful construction; instead, it serves as an optimistic upper-bound stress variant for studying the maximum concurrency and overlap that the scheduler could exploit.
+
+Table~\ref{tab:supp_asyncbench_variants} compares the statistics of the three dependency-policy variants.
+
+\subsection{Example: Three Policies on a Single Sample}
+\label{sec:supp_asyncbench_example}
+
+To make the distinction concrete, we trace one AsyncBench sample through all three policies.
+
+\begin{examplebox}
+\textbf{User request}: \emph{``I'm a car enthusiast and I'm interested in electric vehicles. Can you provide me with a list of makes and models available, along with their body types? I'm specifically looking for models with a high expert rating in economy.''}
+
+\medskip\textbf{Tool calls}:
+\begin{enumerate}[leftmargin=*, nosep]
+  \item[$C_1$:] \texttt{getmakes}$()$ -- retrieve the full list of car makes. Latency $\approx$6.2\,s.
+  \item[$C_2$:] \texttt{tier3}$($\texttt{msrp=economy}$)$ -- filter models by economy tier. Latency $\approx$7.0\,s.
+  \item[$C_3$:] \texttt{tier1}$($\texttt{make=Tesla, sortby=expertRating}$)$ -- retrieve Tesla models sorted by expert rating. Latency $\approx$4.4\,s. \emph{Depends on $C_1$'s result.}
+\end{enumerate}
+
+\medskip\textbf{LLM-DAG (conservative).}~~
+The LLM parser adds edge $C_1 \!\to\! C_3$ (Tesla appears in $C_1$'s output) and leaves $C_2$ independent.
+DAG: one edge ($C_1 \!\to\! C_3$), two parallel roots ($C_1, C_2$).
+Return order: $C_1$ (6.2\,s) $\to$ $C_2$ (7.0\,s) $\to$ $C_3$ (10.6\,s).
+
+\medskip\textbf{Balanced-DAG (default).}~~
+Same conclusion for this sample: $C_3$ depends on $C_1$, $C_2$ is parallel.
+Because $C_3$ starts only after $C_1$ returns ($t$=6.7\,s) and finishes at $t$=11.1\,s, while $C_2$ finishes at $t$=7.3\,s, the return order is $C_1 \!\to\! C_2 \!\to\! C_3$ (happens to match logical order).
+
+\medskip\textbf{All-Parallel (optimistic).}~~
+All three calls dispatched at $t$=0.3\,s. $C_3$ no longer waits for $C_1$, so the return order becomes $C_1$ (6.5\,s) $\to$ $C_3$ (6.7\,s) $\to$ $C_2$ (7.3\,s)---an \emph{out-of-order} arrival.
+A sequential prefill would process $[C_1; C_3; C_2]$, misplacing $C_2$'s economy-filter context.
+LinkCLAW block-prefills each result on arrival and chains link tokens in logical order $\mathcal{L}_1 \!\to\! \mathcal{L}_2 \!\to\! \mathcal{L}_3$, preserving semantic correctness.
+\end{examplebox}
+
+\begin{table}[!t]
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand\arraystretch{1.05}
+\centering
+\caption{Comparison of AsyncBench dependency policy variants. /\# denotes per sample. Count-valued cells report mean\,/\,median\,/\,p99\,/\,max.}
+\label{tab:supp_asyncbench_variants}
+\begin{tabular}{l|ccc}
+\toprule
+\textbf{Metric} & \textbf{LLM-DAG} & \textbf{Balanced-DAG} & \textbf{All-Parallel} \\
+\midrule
+\# samples & 24,159 & 35,654 & 44,705 \\
+Retention & 54.04\% & 79.75\% & 100.00\% \\
+Tool calls /\# & 3.56 / 4 / 5 / 5 & 3.25 / 3 / 5 / 5 & 3.19 / 3 / 5 / 5 \\
+Parallel roots /\# & 2.45 / 2 / 5 / 5 & 2.63 / 2 / 5 / 5 & 3.19 / 3 / 5 / 5 \\
+Serial dep. /\# & 1.11 / 1 / 3 / 3 & 0.62 / 0 / 3 / 3 & 0.00 / 0 / 0 / 0 \\
+Dep.\ edges /\# & 1.15 / 1 / 4 / 8 & 0.65 / 0 / 3 / 9 & 0.00 / 0 / 0 / 0 \\
+Longest dep. & 1.94 / 2 / 3 / 4 & 1.55 / 1 / 3 / 4 & 1.00 / 1 / 1 / 1 \\
+Fully parallel & 21.30\% & 54.82\% & 100.00\% \\
+Out-of-order & 87.01\% & 74.02\% & 78.58\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In the finalized construction, LLM-DAG is indeed the most conservative variant: it retains only 24,159 of the 44,705 parsable ToolBench trajectories (54.04\%), raises the average number of dependency edges to 1.15 per sample, and reduces the fully parallel fraction to 21.30\%.
+Balanced-DAG remains the main-paper default, preserving substantially more episodes while still enforcing lightweight sequential constraints.
+All-Parallel retains the entire parsable pool and, by construction, removes all dependency edges, making it the optimistic upper bound for overlap-oriented scheduling studies.

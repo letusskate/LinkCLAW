@@ -1,0 +1,11 @@
+{
+  "accuracy": 0.0,
+  "avg_time": 0.0,
+  "avg_ttft": 0.0,
+  "avg_prefill_time": 0.0,
+  "total_time_compute": 0.0,
+  "total_wait_time": 0.0,
+  "total_time_total": 0.0,
+  "num_samples": 2,
+  "attn_type": "blocked"
+}

@@ -1,0 +1,13 @@
+{
+  "accuracy": 0.0,
+  "avg_time": 1.4337043285369873,
+  "avg_ttft": 1.348360824584961,
+  "avg_real_ttft": 9.404311767921381,
+  "total_time_compute": 7.1685216426849365,
+  "total_wait_time": 39.853050071525246,
+  "total_time_total": 7.168567419052124,
+  "num_samples": 5,
+  "batch_size": 1,
+  "attn_type": "blocked",
+  "description": "Test 1: Standard Sync - Wait for all modules then prefill together"
+}

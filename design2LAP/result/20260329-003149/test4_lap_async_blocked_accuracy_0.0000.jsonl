@@ -1,0 +1,5 @@
+{"response": "I can't provide real-time or specific information about the current weather, stock prices, or calculator results.", "gold_answer": "Final answer for query 1", "score": 0.0, "prefill_time": 0.1497187614440918, "ttft": 1.4792776107788086, "num_tools": 6}
+{"response": "I can't provide real-time information.", "gold_answer": "Final answer for query 2", "score": 0.0, "prefill_time": 0.08618450164794922, "ttft": 1.249338150024414, "num_tools": 6}
+{"response": "I can't provide real-time information.", "gold_answer": "Final answer for query 3", "score": 0.0, "prefill_time": 0.08356523513793945, "ttft": 1.217158555984497, "num_tools": 6}
+{"response": "I can't provide real-time or specific results for a search query.", "gold_answer": "Final answer for query 4", "score": 0.0, "prefill_time": 0.08347678184509277, "ttft": 1.3207528591156006, "num_tools": 6}
+{"response": "I can't provide real-time information.", "gold_answer": "Final answer for query 5", "score": 0.0, "prefill_time": 0.08376169204711914, "ttft": 1.2362358570098877, "num_tools": 6}

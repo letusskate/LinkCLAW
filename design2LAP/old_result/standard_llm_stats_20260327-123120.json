@@ -1,0 +1,10 @@
+{
+  "accuracy": 1.0,
+  "avg_time": 2.2499170303344727,
+  "avg_ttft": 1.9121146202087402,
+  "total_time_compute": 2.2499170303344727,
+  "total_wait_time": 10.170823175997917,
+  "total_time_total": 12.42074020633239,
+  "num_samples": 1,
+  "batch_size": 1
+}

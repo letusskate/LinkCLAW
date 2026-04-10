@@ -1,0 +1,15 @@
+{
+  "accuracy": 0.0,
+  "avg_time": 3.944709062576294,
+  "avg_prefill_time": 0.12723946571350098,
+  "avg_ttft": 3.501690626144409,
+  "avg_real_ttft": 8.514777400155056,
+  "avg_ttft_after_last_tool": 3.502958059310913,
+  "total_time_compute": 3.944709062576294,
+  "total_wait_time": 5.011819340844143,
+  "total_time_total": 8.956528403420437,
+  "num_samples": 1,
+  "attn_type": "blocked",
+  "description": "Test 4: Block+Link mode - prefill blocks on arrival, append all links at the end",
+  "timestamp": "2026-03-30T19:06:57.203128"
+}

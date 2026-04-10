@@ -1,0 +1,15 @@
+{
+  "accuracy": 0.0,
+  "avg_time": 1.9120728969573975,
+  "avg_prefill_time": 0.09641623497009277,
+  "avg_ttft": 1.4941697120666504,
+  "avg_real_ttft": 6.506995417733181,
+  "avg_ttft_after_last_tool": 1.495176076889038,
+  "total_time_compute": 1.9120728969573975,
+  "total_wait_time": 5.011819340844143,
+  "total_time_total": 6.923892237801541,
+  "num_samples": 1,
+  "attn_type": "blocked",
+  "description": "Test 1: Streamed baseline - wait for all tools before prefill",
+  "timestamp": "2026-03-30T19:06:09.550946"
+}

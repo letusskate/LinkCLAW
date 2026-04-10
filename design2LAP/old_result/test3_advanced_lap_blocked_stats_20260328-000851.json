@@ -1,0 +1,12 @@
+{
+  "accuracy": 0.0,
+  "avg_time": 10.548915004730224,
+  "avg_ttft": 1.4148632049560548,
+  "avg_prefill_time": 9.05734748840332,
+  "total_time_compute": 52.74457502365112,
+  "total_wait_time": 44.35669403479258,
+  "total_time_total": 97.1012690584437,
+  "num_samples": 5,
+  "attn_type": "blocked",
+  "description": "Test 3: Advanced LAP - Prefill internal + link immediately for all arrived, even non-continuous"
+}

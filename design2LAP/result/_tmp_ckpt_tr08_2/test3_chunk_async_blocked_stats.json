@@ -1,0 +1,15 @@
+{
+  "accuracy": 0.0,
+  "avg_time": 3.4067739248275757,
+  "avg_prefill_time": 0.06701385974884033,
+  "avg_ttft": 3.192653179168701,
+  "avg_real_ttft": 9.052136707402955,
+  "avg_ttft_after_last_tool": 3.194243311882019,
+  "total_time_compute": 6.813547849655151,
+  "total_wait_time": 11.715786791041872,
+  "total_time_total": 18.529334640697023,
+  "num_samples": 2,
+  "attn_type": "blocked",
+  "description": "Test 3: Chunk mode - prefill a module only when its full logical prefix is ready",
+  "timestamp": "2026-03-30T19:50:47.442247"
+}

@@ -1,0 +1,15 @@
+{
+  "accuracy": 0.0,
+  "avg_time": 3.6420527696609497,
+  "avg_prefill_time": 0.09593331813812256,
+  "avg_ttft": 3.4338892698287964,
+  "avg_real_ttft": 9.292854118444215,
+  "avg_ttft_after_last_tool": 3.434960722923279,
+  "total_time_compute": 7.284105539321899,
+  "total_wait_time": 11.715786791041872,
+  "total_time_total": 18.99989233036377,
+  "num_samples": 2,
+  "attn_type": "blocked",
+  "description": "Test 5: Block+Link chain mode - blocks arrive first, links follow block/link dependencies",
+  "timestamp": "2026-03-30T19:53:08.491076"
+}

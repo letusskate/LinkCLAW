@@ -1,0 +1,12 @@
+{
+  "accuracy": 0.0,
+  "avg_time": 1.9319682121276855,
+  "avg_ttft": 1.762937307357788,
+  "avg_prefill_time": 0.08718819618225097,
+  "total_time_compute": 9.659841060638428,
+  "total_wait_time": 79.84616779746118,
+  "total_time_total": 89.5060088580996,
+  "num_samples": 5,
+  "attn_type": "blocked",
+  "description": "Test 2: Simple Async - Prefill link only if all previous are here"
+}

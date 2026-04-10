@@ -1,0 +1,14 @@
+{
+  "accuracy": 1.0,
+  "avg_time": 2.435619020462036,
+  "avg_ttft": 2.3374922037124635,
+  "avg_real_ttft": 9.984613724284596,
+  "avg_ttft_after_last_tool": 2.3374953985214235,
+  "avg_prefill_time": 0.04748578071594238,
+  "total_time_compute": 24.35619020462036,
+  "total_wait_time": 76.47118540339892,
+  "total_time_total": 100.82737560801928,
+  "num_samples": 10,
+  "attn_type": "blocked",
+  "description": "Test 4: LAP Async - First come first prefill"
+}

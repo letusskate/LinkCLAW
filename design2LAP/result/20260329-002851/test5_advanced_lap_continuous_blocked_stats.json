@@ -1,0 +1,13 @@
+{
+  "accuracy": 0.0,
+  "avg_time": 1.8513277530670167,
+  "avg_ttft": 1.6898225784301757,
+  "avg_real_ttft": 17.659057663801317,
+  "avg_prefill_time": 0.08401541709899903,
+  "total_time_compute": 9.256638765335083,
+  "total_wait_time": 79.84616779746118,
+  "total_time_total": 89.10280656279626,
+  "num_samples": 5,
+  "attn_type": "blocked",
+  "description": "Test5: Advanced LAP with longest continuous prefix ONLY - Prefill internal + link token ONLY on the longest continuous arrived prefix"
+}

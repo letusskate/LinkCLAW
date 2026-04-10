@@ -1,0 +1,112 @@
+\subsection{Temporal Collaborative Scheduling with Link-guided Asynchronous Prefill}
+To address GPU compute idling caused by asynchronous tool-call latency in on-device agent inference, we propose a temporal collaborative scheduling mechanism named \emph{Link-guided Asynchronous Prefill} (LAP).
+The key idea is to \emph{remove the all-ready synchronization barrier} in the prefill stage and execute prefill in a \emph{first-come-first-prefill} manner: once any new context fragment becomes available, LAP immediately pre-fills it to extend the KV cache.
+Unlike conventional designs that implicitly assume an in-order, contiguous token stream, LAP is explicitly built for \emph{asynchronous} and \emph{out-of-order arrivals} of tool observations.
+
+Note that LAP mainly applies to the multi-turn interaction stage after the agent enters the ``plan--execute--observe'' loop.
+In the first-turn cold-start stage, since the context contains only the system prompt and the user's initial query and does not involve asynchronous tool calls, the system still uses the conventional serial prefill process.
+At this time, attention computation relies on the ``first-turn cross-block sparse mask construction'' strategy proposed in Section~\ref{section:mask}.
+While reducing computation, this strategy ensures that the generated semantic centroids $S_j$ and Link Tokens are persisted into the KV storage system $\mathcal{K}$, establishing a globally consistent indexing foundation for subsequent as-ready appends in later turns.
+
+Once entering the multi-turn interaction stage, the model input context exhibits a typical time-layered structure:
+long-term stable historical context $X_{\text{old}}$, the plan $P$ generated in the current turn, and the set of asynchronously arriving tool observations ${O_k}$.
+The conventional approach blocks until all $O_k$ are ready, and only then launches prefill for $[X_{\text{old}}; P; O_1;\ldots;O_M]$, creating a scheduling bubble dominated by the slowest tool.
+
+\textbf{Where the bubble comes from.}
+Let $t_k$ be the return time of tool $k$ and let $C(\cdot)$ denote prefill compute time.
+In a synchronous design, the earliest time that prefill can start is $\max_k t_k$, so the end-to-end time-to-first-token roughly follows
+$$\text{TTFT}_{\text{sync}} \approx \max_k t_k + C\big([X_{\text{old}}; P; O_1;\ldots;O_M]\big).$$
+During $[0, \max_k t_k]$, the GPU is largely idle.
+
+\textbf{LAP pipeline to overlap compute and I/O.}
+LAP starts tool calls immediately, but it does \emph{not} wait.
+It first pre-fills the static prefix $\text{prompt}_{\text{static}}=[X_{\text{old}}; P]$ while tool calls run in the background.
+Then, whenever any observation fragment $O_k$ arrives, LAP immediately performs a \emph{prefill-only} pass on that fragment (i.e., $\texttt{max\_tokens}=0$), updates the KV cache, and continues listening for the next arrival.
+This turns the original ``wait-for-all'' stall into a sequence of short, incremental prefill jobs that can be scheduled whenever the GPU would otherwise be idle.
+As a result, the remaining bubble is bounded by the mismatch between cumulative prefill compute and the slowest tool latency:
+$$\text{TTFT}_{\text{LAP}} \approx \max\Big(C(\text{prompt}_{\text{static}})+\sum_{k=1}^{M}C(O_k),\ \max_k t_k\Big) + \text{(small tail)}.$$
+
+\textbf{Why LAP is correct under out-of-order arrivals.}
+At first glance, ``$Y$ is late but $Z$ is early'' seems to require inserting $Y$ into the middle of an already-prefilled sequence, which would normally invalidate previously computed hidden states under absolute positional encoding.
+LocalCLAW avoids this pitfall by leveraging its \emph{block-decoupled} attention topology: ordinary tokens are restricted to \emph{intra-block} causal self-attention, and \emph{cross-block} dependencies are mediated by the lightweight Link Tokens.
+This separation enables a two-level positional treatment that is robust to arrival order:
+
+(1) \textbf{Intra-block self-attention (local positions).}
+Within each block/fragment, ordinary tokens use standard positional encoding and causal self-attention, with positions defined \emph{locally} inside the fragment.
+Therefore, a fragment can be prefilled as soon as its text is available; its per-token KV is well-defined without requiring all other fragments to have arrived.
+
+(2) \textbf{Inter-block Link attention (ALiBi-style level bias).}
+For Link-mediated cross-block interactions (Link-to-Link and Link-to-Token), we add an ALiBi-style linear bias based on \emph{logical block indices (levels)} rather than absolute token offsets.
+Each fragment is assigned a fixed level id according to its semantic role in the turn (e.g., the $k$-th tool observation), independent of its length and arrival time.
+As a result, ``late insertion'' does not shift previously assigned coordinates.
+
+Consider three fragments $X$ (ready), $Y$ (late), and $Z$ (ready early) with a fixed logical order $X \prec Y \prec Z$.
+LAP can immediately prefill $Z$ locally and compute the Link($Z$)$\rightarrow$Link($X$) contribution.
+When $Y$ arrives, LAP computes the missing Link($Z$)$\rightarrow$Link($Y$) contribution and merges it with cached attention \emph{statistics}.
+Since attention uses Softmax normalization, LAP caches sufficient online-Softmax statistics (e.g., per-row running max and log-sum-exp normalizers, as in FlashAttention-style online Softmax) rather than reusing already-normalized attention outputs, ensuring the final Link state matches the one-shot computation over $[X;Y]$.
+Meanwhile, the mask-router updates the sparse mask online per arrival, so the spatial sparse topology evolves consistently with temporal arrivals.
+
+\textbf{What is actually incremental (and why it is lightweight).}
+Importantly, LAP does \emph{not} require storing all intermediate dense attention matrices.
+In LocalCLAW, the only cross-fragment aggregation that must remain globally consistent is the Link-mediated attention; ordinary tokens remain local to their fragment.
+Therefore, the runtime caches incremental attention \emph{statistics} for Link queries only, and reuses per-fragment KV caches for keys/values.
+This makes out-of-order correctness inexpensive: late arrivals only trigger a small amount of additional Link attention work and a corresponding sparse-mask update.
+
+\begin{algorithm}[!h]
+\caption{LAP algorithm}
+\label{alg:lgap_prefill}
+\SetKwFunction{AsyncCall}{asyncCall}
+\SetKwFunction{AwaitAny}{awaitAny}
+\SetKwFunction{InitRouter}{initMaskRouter}
+\SetKwFunction{GetLocalPos}{getLocalPos}
+\SetKwFunction{LLMGen}{model.generate}
+\SetKwFunction{UpdateMask}{updateMask}
+
+\KwIn{Request id $\text{req\_id}$, historical context $X_{\text{old}}$, previous-turn model plan output $P$, tool execution callback functions $\mathcal{F}=\{f_k\}_{k=1}^{M}$, KV cache $\mathcal{K}$, maximum generation length $L_{\text{max}}$}
+\KwOut{Current-turn model output $Y$}
+
+$\text{futures} \leftarrow \{\AsyncCall(f_k)\}_{k=1}^{M}$\;
+
+$\text{prompt}_{\text{static}} \leftarrow [X_{\text{old}}; P]$\;
+$pos\_ids \leftarrow \GetLocalPos(\text{len}(X_{\text{old}} + P))$\;
+$\text{router} \leftarrow \InitRouter(\text{req\_id}, \mathcal{K})$\;
+$\text{mask}_{\text{static}} \leftarrow \text{router.compute}(\text{prompt}_{\text{static}})$\;
+\LLMGen($\text{prompt}_{\text{static}}$, $\text{mask}_{\text{static}}$, $\text{position\_ids}=pos\_ids$, $\text{kv\_cache}=\mathcal{K}$, $\text{max\_tokens}=0$, $\text{request\_id}=\text{req\_id}$, $\text{enable\_prefix\_caching}=\text{True}$)\;
+
+$c \leftarrow 0$\;
+\While{$c < M$}{
+    $(k, O_k) \leftarrow \AwaitAny(\text{futures})$\;
+    $\ell_k \leftarrow \text{len}(O_k)$\;
+    $pos\_ids \leftarrow \GetLocalPos(\ell_k)$\;
+    $\text{mask}_{k} \leftarrow \text{router.compute}(O_k, \text{level\_id}=k)$\;
+    
+    $c \leftarrow c+1$\;
+    
+    \eIf{$c < M$}{
+        \LLMGen($O_k$, $\text{mask}_{k}$, $\text{position\_ids}=pos\_ids$, $\text{kv\_cache}=\mathcal{K}$, $\text{max\_tokens}=0$, $\text{request\_id}=\text{req\_id}$)\;
+    }{
+        $Y \leftarrow \LLMGen(O_k, \text{mask}_{k}, \text{position\_ids}=pos\_ids, \text{kv\_cache}=\mathcal{K}, \text{max\_tokens}=L_{\text{max}}, \text{request\_id}=\text{req\_id}$)\;
+    }
+}
+\Return{$Y$}\;
+\end{algorithm}
+
+Algorithm~\ref{alg:lgap_prefill} illustrates the overall execution flow of LAP. For each turn that enters the tool-interaction stage,
+the system first generates a globally unique request identifier $req_id$ and initializes a corresponding mask-router instance $router$, which coordinates the attention-topology state and cross-fragment access permissions for the current session.
+After initialization, the system immediately triggers all tool callback functions $\mathcal{F}$ asynchronously.
+While tools execute in the background, LAP does not wait; instead, it first launches prefill for the static prefix $\text{prompt}_{\text{static}}$ (i.e., $[X_{\text{old}}; P]$).
+During this process, LAP assigns local positional encodings within each fragment and uses the router to attach a stable logical level id to each arriving observation.
+This decouples arrival order from logical order and avoids shifting positional coordinates when fragments arrive out of order.
+The system uses prefix caching (Prefix Caching) to automatically activate the KV cache for $X_{\text{old}}$, avoiding redundant computation over historical information.
+For the newly added planning segment $P$, the system directly computes attention using the ``interaction-stage cross-block sparse mask construction'' strategy defined in Section~\ref{section:mask}, and generates and stores its KV cache.
+
+After processing the static prefix, LAP smoothly transitions to the observation-driven incremental stage. The system then continuously listens to the asynchronous task pool using the awaitAny primitive.
+Once any tool function $f_k$ returns an observation result $O_k$, regardless of its call order in the original plan, the system immediately treats it as the latest context segment for the current turn.
+Concretely, the system assigns local positional encodings within $O_k$ and tags it with a stable logical level id.
+The $router$ computes the cross-block sparse mask for $O_k$ in real time, including the ALiBi-style level bias for Link-mediated cross-fragment attention.
+The system then calls $model.generate$ with $max\_tokens=0$, forcing the model to perform prefill only and update the KV cache.
+
+This loop continues until all tool callbacks $\mathcal{F}$ have been processed.
+While processing the final observation segment, the system switches to normal decoding mode, i.e., $max\_tokens=L_{max}$, and starts generating the final response $Y$.
+This link-guided asynchronous prefill mechanism, based on fragmentation and dynamic mask updates, not only substantially improves on-device GPU task scheduling in engineering practice,
+but also algorithmically integrates previously isolated inference fragments into a coherent whole, significantly improving the agent's execution efficiency under high-latency I/O.

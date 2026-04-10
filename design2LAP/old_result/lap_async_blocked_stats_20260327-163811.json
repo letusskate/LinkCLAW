@@ -1,0 +1,11 @@
+{
+  "accuracy": 0.0,
+  "avg_time": 9.230417251586914,
+  "avg_ttft": 1.438694953918457,
+  "avg_prefill_time": 7.595480799674988,
+  "total_time_compute": 18.460834503173828,
+  "total_wait_time": 14.728572819689141,
+  "total_time_total": 33.18940732286297,
+  "num_samples": 2,
+  "attn_type": "blocked"
+}

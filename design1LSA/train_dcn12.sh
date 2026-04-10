@@ -1,0 +1,19 @@
+export NCCL_DEBUG=INFO
+export NCCL_IB_DISABLE=0
+export NCCL_SOCKET_IFNAME=ens7f0np0     # 例如: enp4s0 或 eth0，作为 TCP 回退与初始探测
+export NCCL_IB_HCA=mlx5_0,mlx5_1                 # 实际 HCA 名称，至少包含 mlx5_0
+export NCCL_IB_GID_INDEX=3                       # RoCE v2 常用；若 IB 原生链路可省略或设 0
+export NCCL_ASYNC_ERROR_HANDLING=1               # 异步错误更易诊断
+
+
+MASTER_ADDR=${MASTER_ADDR:-10.10.60.27}
+MASTER_PORT=${MASTER_PORT:-29400}
+
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+export PYTORCH_NO_CUDA_MEMORY_CACHING=1
+export PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.6,max_split_size_mb:128
+
+torchrun --nnodes=2 --node_rank=1 --nproc_per_node=1 \
+    --rdzv_backend=c10d --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} \
+    titan_trainer.py --config_name=wybtest --enable_cpu_offload
