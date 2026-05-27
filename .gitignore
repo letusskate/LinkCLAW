@@ -1,3 +1,8 @@
+# 文档
+*.tex
+*.png
+**/doc/**
+*.pdf
 # 文章
 main.pdf
 supplementary.pdf
