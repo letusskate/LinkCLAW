@@ -1,4 +1,7 @@
 # 文档
+**/old_script/**
+**/old_result/**
+**/develop.md
 *.tex
 *.png
 **/doc/**

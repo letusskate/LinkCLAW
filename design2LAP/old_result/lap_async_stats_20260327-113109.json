@@ -1,9 +1,0 @@
-{
-  "accuracy": 0.0,
-  "avg_time": 4.135682702064514,
-  "avg_ttft": 3.7682214975357056,
-  "avg_prefill_time": 0.0954514741897583,
-  "total_time": 8.271365404129028,
-  "num_samples": 2,
-  "attn_type": "standard"
-}
